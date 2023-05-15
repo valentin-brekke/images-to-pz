@@ -5,9 +5,9 @@
 1. Inception_Pasquet
 
     Main notebook with the inception model organised in 3 parts : 
-        * Regular Training
-        * Training with an additional feature, reddening
-        * Using the model to output distribution and not only point estimates
+        - Regular Training
+        - Training with an additional feature, reddening
+        - Using the model to output distribution and not only point estimates
     
     For the moment, the most important is the vanila training from part one.
     
