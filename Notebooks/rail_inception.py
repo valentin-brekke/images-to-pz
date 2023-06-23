@@ -110,7 +110,14 @@ class Inform_Inception(CatInformer):
         Train a inception NN on a fraction of the training data
         """
         # Not sure what .get_data('input') is ?
-        training_data = self.get_data('input')
+        train_data = self.get_data('input')
+        
+        # From 2d array to 
+        z = train_data[:, 0]
+        img = train_data[:, 1:].reshape((-1, 64, 64, 5))
+        
+        training_data = img, z 
+    
         
         img, scaling = processing(training_data[0])
         print(scaling)
@@ -155,7 +162,12 @@ class Inception(CatEstimator):
             self.scaling = self.model['scale']
 
     def run(self):
-        test_data = self.get_data('input')
+        testing_data = self.get_data('input')
+        
+        z = testing_data[:, 0]
+        img = testing_data[:, 1:].reshape((-1, 64, 64, 5))
+        
+        test_data = img, z 
         # Process test images same way as training set
         img_test = np.arcsinh(test_data[0] / self.scaling / 3.)
         preds = self.nnmodel.predict(img_test)
@@ -164,8 +176,9 @@ class Inception(CatEstimator):
         #self.pred_non_scale = preds_non_scale.squeeze()
         
     def finalize(self):
-        test_data = self.get_data('input')
-        dz, pred_bias, smad, out_frac = metrics(test_data[1], self.pred)
+        testing_data = self.get_data('input')
+        z = testing_data[:, 0]
+        dz, pred_bias, smad, out_frac = metrics(z, self.pred)
         print_metrics(pred_bias, smad, out_frac)
-        plot_result(test_data[1], self.pred)
+        plot_result(z, self.pred)
         
