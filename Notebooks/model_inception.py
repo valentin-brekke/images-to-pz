@@ -8,7 +8,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Conv2D, PReLU, AveragePooling2D, Concatenate, Dense, Input, Flatten
-
+import tensorflow_probability as tfp
+tfd = tfp.distributions
 
 def inception(input, nbS1, nbS2, name, output_name, without_kernel_5=False):
 
@@ -46,7 +47,7 @@ def inception(input, nbS1, nbS2, name, output_name, without_kernel_5=False):
 
 
 
-def model_tf2(with_ebv = False):
+def model_tf2(with_ebv = False, output_distrib=False, num_components=16):
     
     Image = Input(shape=(64, 64, 5))
     if with_ebv:
@@ -69,14 +70,26 @@ def model_tf2(with_ebv = False):
     i4 = inception(pool2, 92,128, name="I4_", output_name="INCEPTION4", without_kernel_5=True)
     
     flatten = Flatten()(i4)
+    
     if with_ebv:
         concat = Concatenate()([flatten, reddening])
-        d0 = Dense(1024, activation='relu')(concat)
+        d0 = Dense(512, activation='relu')(concat)
     else:
-        d0 = Dense(1024, activation='relu')(flatten)
-    d1 = Dense(1024, activation='relu')(d0)
-    outputs = Dense(1)(d1)
+        d0 = Dense(512, activation='relu')(flatten)
+    d1 = Dense(256, activation='relu')(d0)
+    
+    if not output_distrib:
+        outputs = Dense(1)(d1)
+    else:
+        param = Dense(3*num_components)(d1)
    
+        outputs = tfp.layers.DistributionLambda(lambda t: tfd.Independent(
+            tfd.MixtureSameFamily(
+                mixture_distribution=tfd.Categorical(logits=tf.expand_dims(t[..., :num_components], -2)),
+                components_distribution=tfd.Beta(
+                    1 + tf.nn.softplus(tf.expand_dims(t[..., num_components:2*num_components], -2)),
+                    1 + tf.nn.softplus(tf.expand_dims(t[..., 2*num_components:],-2)))), 1))(param)
+    
     if with_ebv:
         model = Model(inputs=[Image, reddening], outputs=outputs, name="incept_model")
     else:
