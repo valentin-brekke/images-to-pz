@@ -22,7 +22,7 @@ from tools import *
 
 def processing(img):
     '''
-    Preprocesses the images by normalising them sacling 
+    Preprocess the images by scaling them with ther MAD
     '''
     scaling = []
     for i in range(img.shape[-1]):
@@ -66,18 +66,15 @@ def metrics(z, pred):
     pred_bias = np.mean(dz)
     MAD = np.median(np.abs(dz - np.median(dz)))
     smad = 1.4826 * MAD
-    out_frac_1 = np.sum(np.abs(dz) > 0.05) / float(len(z))
-    #out_frac_2 = np.sum(dz > 5*smad) / float(len(z))
+    out_frac = np.sum(np.abs(dz) > 0.05) / float(len(z))
     
-    return dz, pred_bias, smad, out_frac_1
-
+    return dz, pred_bias, smad, out_frac
 
 def print_metrics(pred_bias, smad, out_frac):
     print(f'Prediction bias: {pred_bias:.4f}')
     display(Latex(f'$\sigma MAD$: {smad:.4f}'))
     print(f'Outlier fraction: {out_frac*100:.2f}%')
 
-    
 def plot_result(z, preds):
     '''
     Plots the predictions compared to the true redshift
@@ -88,17 +85,34 @@ def plot_result(z, preds):
     plt.plot([0,0.7],[0,0.7],color='r')
     plt.xlabel('Spectroscopic Redshift')
     plt.ylabel('Predicted Redshift');
-    
 
+
+def plot_results(sz, pz, pred_bias, out_frac, smad, save=False, path=''):
+    plt.hist2d(sz, pz, 150, range=[[0,0.6],[0,0.6]], cmap='gist_stern', cmin=1e-3); 
+    plt.gca().set_aspect('equal');
+    plt.plot([0,0.7],[0,0.7],color='black')
+    plt.xlabel('Spectroscopic Redshift' , fontsize=14)
+    plt.ylabel('Predicted Redshift', fontsize=14)
+    cbar = plt.colorbar()
+    cbar.set_label('Samples')
+    number = 0.1
+    plt.text(0.1, 0.45, '$ \Delta_z =$' + str(round(pred_bias, 4)) + '\n' 
+             + '$\eta =$' + str(round(out_frac*100, 2)) + '%' + '\n'
+             + '$\sigma_{MAD}=$'+ str(round(smad, 4)),
+             bbox=dict(facecolor='w', alpha=0.8, pad=8), fontsize=14);
+    if save:
+        plt.savefig(path, dpi=150)
+
+        
 class Inform_Inception(CatInformer):
     """
-    Subclass to train a simple point estimate Neural Net photoz
+    Subclass to train a Neural Net photoz estimator
     with the inception model from Pasquet et al. article 
     """
     name = 'Inform_Inception'
     config_options = CatInformer.config_options.copy()
     config_options.update(trainfrac=Param(float, 0.75, msg="fraction of training and validation data"),
-                          epoch=Param(int, 1),
+                          epoch=Param(int, 5),
                           hdf5_groupname=SHARED_PARAMS)
              
                 
@@ -112,22 +126,17 @@ class Inform_Inception(CatInformer):
         # Not sure what .get_data('input') is ?
         train_data = self.get_data('input')
         
-        # From 2d array to 
+        # Recover img and z from the array
         z = train_data[:, 0]
         img = train_data[:, 1:].reshape((-1, 64, 64, 5))
         
-        training_data = img, z 
-    
-        
-        img, scaling = processing(training_data[0])
-        print(scaling)
+        img, scaling = processing(img)
         self.scaling = scaling
-        #img = training_data[0]
-        ntrain = round(training_data[0].shape[0] * self.config.trainfrac)
+        ntrain = round(img.shape[0] * self.config.trainfrac)
         img_train = img[:ntrain]
         img_val = img[ntrain:]
-        z_train = training_data[1][:ntrain]
-        z_val= training_data[1][ntrain:]
+        z_train = z[:ntrain]
+        z_val= z[ntrain:]
         print(f"Split into {len(z_train)} training and {len(z_val)} validation samples")
         
         model = model_tf2()
@@ -137,12 +146,12 @@ class Inform_Inception(CatInformer):
         learning_curves(history)
         self.model = dict(nnmodel=model, scale=scaling)
         self.add_data('model', self.model)
-        
+
         
 class Inception(CatEstimator):
     """Inception estimator
     """
-    name = 'KNearNeighPDF'
+    name = 'Inception_Estimator'
     config_options = CatEstimator.config_options.copy()
     config_options.update()
     
@@ -167,18 +176,14 @@ class Inception(CatEstimator):
         z = testing_data[:, 0]
         img = testing_data[:, 1:].reshape((-1, 64, 64, 5))
         
-        test_data = img, z 
         # Process test images same way as training set
-        img_test = np.arcsinh(test_data[0] / self.scaling / 3.)
+        img_test = np.arcsinh(img / self.scaling / 3.)
         preds = self.nnmodel.predict(img_test)
-        #preds_non_scale = self.nnmodel.predict(test_data[0])
         self.pred = preds.squeeze()
-        #self.pred_non_scale = preds_non_scale.squeeze()
         
     def finalize(self):
         testing_data = self.get_data('input')
         z = testing_data[:, 0]
         dz, pred_bias, smad, out_frac = metrics(z, self.pred)
         print_metrics(pred_bias, smad, out_frac)
-        plot_result(z, self.pred)
-        
+        plot_results(z, self.pred, pred_bias, out_frac, smad)
