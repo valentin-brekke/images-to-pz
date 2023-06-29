@@ -25,15 +25,20 @@
 ## Towards an insertion of the Inception model into RAIL Development stage 1
 
 1. rail_inception.py
+   
    Here is the inform and estimator class that follow the RAIL pipeline architecture
 
 2. rail_incep.ipynb
+   
    This notebook shows how to call and use those two classes.
 
 
 ## Additional files
 
 1. Tools
+   
    Contains different useful functions used in all notebooks
-3. Inception_Pasquet
+   
+2. Inception_Pasquet
+
    Contains the code for the main Inception model
