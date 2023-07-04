@@ -75,18 +75,6 @@ def print_metrics(pred_bias, smad, out_frac):
     display(Latex(f'$\sigma MAD$: {smad:.4f}'))
     print(f'Outlier fraction: {out_frac*100:.2f}%')
 
-def plot_result(z, preds):
-    '''
-    Plots the predictions compared to the true redshift
-    '''
-    
-    plt.hist2d(z, preds, 64, range=[[0,0.7],[0,0.7]], cmap='gist_stern'); 
-    plt.gca().set_aspect('equal');
-    plt.plot([0,0.7],[0,0.7],color='r')
-    plt.xlabel('Spectroscopic Redshift')
-    plt.ylabel('Predicted Redshift');
-
-
 def plot_results(sz, pz, pred_bias, out_frac, smad, save=False, path=''):
     plt.hist2d(sz, pz, 150, range=[[0,0.6],[0,0.6]], cmap='gist_stern', cmin=1e-3); 
     plt.gca().set_aspect('equal');
